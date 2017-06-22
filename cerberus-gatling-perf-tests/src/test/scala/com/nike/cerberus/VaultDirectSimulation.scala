@@ -64,6 +64,7 @@ class VaultDirectSimulation extends Simulation {
          |   PEAK_USERS: $peakUsers
          |   RAMP_UP_TIME_IN_MINUTES:  $rampUpTimeInMinutes
          |   HOLD_TIME_AFTER_PEAK_IN_MINUTES: $holdTimeAfterPeakInMinutes
+         |   ORPHAN_TOKEN_TTL: $tokenTtl
          |
          |######################################################################
          |
