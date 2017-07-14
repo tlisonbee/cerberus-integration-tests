@@ -119,9 +119,9 @@ class VaultDirectSimulation extends Simulation {
     scn.inject(
       rampUsers(peakUsers) over(rampUpTimeInMinutes minutes),
       constantUsersPerSec(peakUsers) during(holdTimeAfterPeakInMinutes minutes)
-    ).throttle(
-      reachRps(peakUsers) in(rampUpTimeInMinutes minutes),
-      holdFor(holdTimeAfterPeakInMinutes minutes)
+//    ).throttle(
+//      reachRps(peakUsers) in(rampUpTimeInMinutes minutes),
+//      holdFor(holdTimeAfterPeakInMinutes minutes)
     )
   ).protocols(httpConf)
 
