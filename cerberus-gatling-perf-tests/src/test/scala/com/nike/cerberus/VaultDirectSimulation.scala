@@ -91,7 +91,7 @@ class VaultDirectSimulation extends Simulation {
   val httpConf: HttpProtocolBuilder = http.baseURL(vaultAddr)
 
   val scn: ScenarioBuilder =
-    scenario("Iam principal authenticates and then reads secrets")
+    scenario("VaultDirectSimulation: Iam principal authenticates and then reads secrets")
       .exec(
         http("create an orphan token")
           .post("/v1/auth/token/create-orphan")
