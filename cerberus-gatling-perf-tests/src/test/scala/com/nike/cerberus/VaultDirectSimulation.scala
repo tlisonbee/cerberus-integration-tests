@@ -102,7 +102,7 @@ class VaultDirectSimulation extends Simulation {
             jsonPath("$.auth.client_token").find.saveAs("auth_token")
           )
       ).exec(exitHereIfFailed)
-      .repeat(99) {
+      .repeat(4) {
         feed(generatedData.random)
         .exec(
           http("read node from vault")
