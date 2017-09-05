@@ -92,7 +92,7 @@ class VaultDirectSimulation extends Simulation {
   val httpConf: HttpProtocolBuilder = http.baseURL(vaultAddr)
 
   val scn: ScenarioBuilder =
-    scenario("Iam principal authenticates and then reads secrets")
+    scenario("VaultDirectSimulation: Iam principal authenticates and then reads secrets")
       .exec(
         http("create an orphan token")
           .post("/v1/auth/token/create-orphan")
@@ -103,7 +103,7 @@ class VaultDirectSimulation extends Simulation {
             jsonPath("$.auth.client_token").find.saveAs("auth_token")
           )
       ).exec(exitHereIfFailed)
-      .repeat(99) {
+      .repeat(4) {
         feed(generatedData.random)
         .exec(
           http("read node from vault")
@@ -120,9 +120,9 @@ class VaultDirectSimulation extends Simulation {
     scn.inject(
       rampUsers(peakUsers) over(rampUpTimeInMinutes minutes),
       constantUsersPerSec(peakUsers) during(holdTimeAfterPeakInMinutes minutes)
-    ).throttle(
-      reachRps(peakUsers) in(rampUpTimeInMinutes minutes),
-      holdFor(holdTimeAfterPeakInMinutes minutes)
+//    ).throttle(
+//      reachRps(peakUsers) in(rampUpTimeInMinutes minutes),
+//      holdFor(holdTimeAfterPeakInMinutes minutes)
     )
   ).protocols(httpConf)
 
