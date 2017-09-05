@@ -90,6 +90,8 @@ class VaultDirectSimulation extends Simulation {
   }
 
   val httpConf: HttpProtocolBuilder = http.baseURL(vaultAddr)
+                                          .shareConnections
+                                          .maxConnectionsPerHost(1000)
 
   val scn: ScenarioBuilder =
     scenario("VaultDirectSimulation: Iam principal authenticates and then reads secrets")
