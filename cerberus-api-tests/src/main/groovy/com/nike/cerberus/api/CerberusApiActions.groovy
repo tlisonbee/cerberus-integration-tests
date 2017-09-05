@@ -3,14 +3,18 @@ package com.nike.cerberus.api
 import com.amazonaws.auth.profile.internal.securitytoken.RoleInfo
 import com.amazonaws.auth.profile.internal.securitytoken.STSProfileCredentialsServiceProvider
 import com.amazonaws.regions.Regions
+import com.amazonaws.services.kms.AWSKMS
 import com.amazonaws.services.kms.AWSKMSClient
 import com.amazonaws.services.kms.model.DecryptRequest
 import com.amazonaws.services.kms.model.DecryptResult
+import com.google.common.cache.Cache
+import com.google.common.cache.CacheBuilder
 import groovy.json.JsonSlurper
 import io.restassured.path.json.JsonPath
 import io.restassured.response.Response
 
 import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
 
 import static io.restassured.RestAssured.*
 import static io.restassured.module.jsv.JsonSchemaValidator.*
@@ -21,6 +25,14 @@ class CerberusApiActions {
 
     public static String V1_SAFE_DEPOSIT_BOX_PATH = "v1/safe-deposit-box"
     public static String V2_SAFE_DEPOSIT_BOX_PATH = "v2/safe-deposit-box"
+    public static String CLEAN_UP_PATH = "/v1/cleanup"
+
+    /**
+     * Use a cache of KMS clients because creating too many kmsCLients causes a performance bottleneck
+     */
+    private static Cache<Tuple2<String,String>,AWSKMSClient> kmsClientCache = CacheBuilder.newBuilder()
+            .expireAfterWrite(30, TimeUnit.MINUTES)
+            .build();
 
     /**
      * Executes a delete on the v1 auth endpoint to trigger a logout / destroy token action
@@ -92,13 +104,19 @@ class CerberusApiActions {
     }
 
     static def getDecryptedPayload(String iamPrincipalArn, String region, String base64EncodedKmsEncryptedAuthPayload, boolean assumeRole = true) {
-        AWSKMSClient kmsClient
-        if (assumeRole) {
-            kmsClient = new AWSKMSClient(new STSProfileCredentialsServiceProvider(
-                    new RoleInfo().withRoleArn(iamPrincipalArn)
-                            .withRoleSessionName(UUID.randomUUID().toString()))).withRegion(Regions.fromName(region))
-        } else {
-            kmsClient = new AWSKMSClient().withRegion(Regions.fromName(region))
+        AWSKMSClient kmsClient = kmsClientCache.getIfPresent(new Tuple2(iamPrincipalArn, region))
+
+        if(kmsClient == null) {
+            System.out.println("getDecryptedPayload() kmsClient cache miss, creating kmsClient for " + iamPrincipalArn + " " + region)
+            if (assumeRole) {
+                kmsClient = new AWSKMSClient(new STSProfileCredentialsServiceProvider(
+                        new RoleInfo().withRoleArn(iamPrincipalArn)
+                                .withRoleSessionName(UUID.randomUUID().toString()))).withRegion(Regions.fromName(region))
+            } else {
+                kmsClient = new AWSKMSClient().withRegion(Regions.fromName(region))
+            }
+
+            kmsClientCache.put(new Tuple2<String, String>(iamPrincipalArn, region), kmsClient)
         }
 
         DecryptResult result = kmsClient.decrypt(
@@ -118,7 +136,7 @@ class CerberusApiActions {
     }
 
     static void createOrUpdateSecretNode(Map data, String path, String cerberusAuthToken) {
-        given().relaxedHTTPSValidation()
+        given()
                 .header("X-Vault-Token", cerberusAuthToken)
                 .body(data)
         .when()
@@ -145,7 +163,7 @@ class CerberusApiActions {
     }
 
     static void deleteSecretNode(String path, String cerberusAuthToken) {
-        given().relaxedHTTPSValidation()
+        given()
                 .header("X-Vault-Token", cerberusAuthToken)
         .when()
                 .delete("/v1/secret/${path}")
@@ -373,5 +391,17 @@ class CerberusApiActions {
                 .assertThat().body(matchesJsonSchemaInClasspath("json-schema/v1/safe-deposit-box/list_success.json"))
         .extract().
                 body().jsonPath()
+    }
+
+    static void cleanUpOrphanedAndInactiveRecords(String cerberusAuthToken, Integer expirationPeriodInDays = null) {
+        given()
+                .header("X-Vault-Token", cerberusAuthToken)
+                .body([
+                    kms_expiration_period_in_days: expirationPeriodInDays
+                ])
+        .when()
+                .put(CLEAN_UP_PATH)
+        .then()
+                .statusCode(204)  // no-content
     }
 }
